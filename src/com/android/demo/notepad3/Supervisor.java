@@ -73,10 +73,10 @@ public class Supervisor implements Runnable{
 		int prevsize = 0;
 		
 		while(true){
-			Activity a = getCurrentActivity();
+			Activity activeActivity = getCurrentActivity();
 			//Tick Sleep
 			try{
-				if(a == null){
+				if(activeActivity == null){
 					//App is Inactive
 					Thread.sleep(1000);
 					continue;
@@ -96,7 +96,8 @@ public class Supervisor implements Runnable{
 					if(prevsize == this.sList.size() && sStack.size() == 0){
 						//TODO : recognize this is new state. only send information at new state
 						//view hierarchy analysis
-						View root = a.getWindow().getDecorView().findViewById(android.R.id.content);
+						View root = activeActivity.getWindow().getDecorView();
+						
 						if(analyzeViewTree(root)){
 							sList.clear();
 						}

@@ -24,7 +24,7 @@ public class MViewBuilder{
 			ch = null;
 		}
 		
-		MonkeyView mv = new MonkeyView(v.getTop(), v.getLeft(), v.getHeight(),v.getWidth(), ch);
+		MonkeyView mv = new MonkeyView(v.getLeft(), v.getTop(), v.getWidth(),v.getHeight(), ch);
 		Log.d("wtchoi","MViewBuilder.built==");
 		Log.d("wtchoi","top="+Integer.toString(v.getTop()));
 		Log.d("wtchoi","top="+Integer.toString(mv.getX()));

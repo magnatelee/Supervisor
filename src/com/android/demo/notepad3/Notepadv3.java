@@ -87,13 +87,13 @@ public class Notepadv3 extends ListActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
     	//INSTRUMENTED
-    	Supervisor.logCall("onCreate",this);
+    	Supervisor.logCall("onCreateOptionMenu",this);
     	
         super.onCreateOptionsMenu(menu);     
         menu.add(0, INSERT_ID, 0, R.string.menu_insert);
         
         //INSTRUMENTED
-        Supervisor.logReturn("onCreate",this);
+        Supervisor.logReturn("onCreateOptionMenu",this);
         
         return true;
     }
