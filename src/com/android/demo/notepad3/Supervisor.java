@@ -15,42 +15,9 @@ import android.os.*;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 
 import edu.berkeley.wtchoi.cc.*;
-
-class SLog{
-	public static final int CALL = 1;
-	public static final int RETURN = 2;
-	public static final int TRUE = 3;
-	public static final int FALSE = 4;
-	public static final int SWITCH = 5;
-	
-	public int type;
-	public String message;
-	public Object obj;
-	
-	public SLog(int lt, String m, Object o){
-		type = lt;
-		message = m;
-		obj = o;
-	}
-	
-	public String toString(){
-		String typ = null;
-		switch(type){
-			case CALL:
-				typ = "CALL";
-				break;
-			case RETURN:
-				typ = "RETURN";
-				break;
-			default:
-				break;
-		}
-		return typ+"("+message+","+obj+")";
-	}
-}
-
 
 class ActivityState{
 	public boolean isActive;
@@ -66,13 +33,39 @@ class ActivityState{
 
 
 public class Supervisor implements Runnable{
+	 
+	private static Supervisor supervisor = null;
+	private Supervisor sSupervisor;
+	private Thread sThread;
+	private LinkedList<SLog> sList;
+	private LinkedList<SLog> sStack;
+	private int tickcount = 0;
+	private HashMap<Activity,ActivityState> activityStates;
+	private java.io.ObjectOutputStream oos;
+	private java.io.ObjectInputStream ois;
+	private boolean isConnected = false;
+	
 	private Supervisor(){}
 
+	public static void init(){
+		if(supervisor == null){
+			supervisor = new Supervisor();
+			supervisor.sThread = new Thread(supervisor);
+			supervisor.sList = new LinkedList<SLog>();
+			supervisor.sStack = new LinkedList<SLog>();
+			supervisor.activityStates = new HashMap<Activity,ActivityState>();
+		}
+	}
+	
 	@Override
-	public void run(){
+	public void run(){	
 		int prevsize = 0;
 		
 		while(true){
+			//Establish Server Connection, at first
+			if(isConnected == false)
+				initiateChannel();
+			
 			Activity activeActivity = getCurrentActivity();
 			//Tick Sleep
 			try{
@@ -94,14 +87,32 @@ public class Supervisor implements Runnable{
 			synchronized(this.sList){
 				if(tickcount == 0){
 					if(prevsize == this.sList.size() && sStack.size() == 0){
+						
+						
 						//TODO : recognize this is new state. only send information at new state
 						//view hierarchy analysis
-						View root = activeActivity.getWindow().getDecorView();
 						
-						if(analyzeViewTree(root)){
-							sList.clear();
+						try {
+							View[] views = getViewRoots(); 
+							LinkedList<MonkeyView> vlist = new LinkedList<MonkeyView>();
+							for(View v: views){
+								//TODO: recognize interesting views
+								//Assumption: views are sorted w.r.t Z-hierarchy
+								Log.d("wtchoi!","<<" + v.getWidth() + "," + v.getHeight() + ">>");
+								vlist.add((new MViewAdoptorV(v)).get());
+							}
+							
+							MonkeyView mroot = new MonkeyView(0,0,0,0,vlist);
+							if(analyzeViewTree(new MViewAdoptorMV(mroot))){
+								sList.clear();
+							}
+							Log.d("wtchoi","handle!:"+prevsize);
+							
+						} catch (Exception e) {
+							e.printStackTrace();
+							System.exit(1);
 						}
-						Log.d("wtchoi","handle!: "+prevsize);
+						//SNIPPET END
 					}
 					tickcount = 10;
 				}
@@ -113,39 +124,60 @@ public class Supervisor implements Runnable{
 		}
 	}
 
-	
-	 
-	private static Supervisor supervisor = null;
-	private Supervisor sSupervisor;
-	private Thread sThread;
-	private LinkedList<SLog> sList;
-	private LinkedList<SLog> sStack;
-	private int tickcount = 0;
-	private HashMap<Activity,ActivityState> activityStates;
-	
-		
-	private static boolean analyzeViewTree(View v){
-		//1. Establish Server Connection
+	private void initiateChannel(){
 		java.net.Socket socket = null;
-		java.io.ObjectOutputStream oos = null;
-		
 		try {
-			socket = new java.net.Socket("128.32.45.173",13339);
-			Log.d("wtchoi","connected!");
-			java.io.OutputStream out = socket.getOutputStream();
-			Log.d("wtchoi","get stream");
-			oos = new java.io.ObjectOutputStream(out);
-			Log.d("wtchoi","get object stream");
+			socket = new java.net.Socket("128.32.45.127",13339);
+			//Log.d("wtchoi","connected!");
+		
+			oos = new java.io.ObjectOutputStream(socket.getOutputStream());
+			ois = new java.io.ObjectInputStream(socket.getInputStream());
+			
+			Log.d("wtchoi","stream initialized");
+			isConnected = true;
 		} catch (Exception e) {
 			Log.d("wtchoi","cannot connect to the server");
-			return false;
-			//e.printStackTrace();
 		}
-		Log.d("wtchoi","stream initialized");
+	}
+	
+	private View getActivityViewRoot(Activity a){
+		Window rootW = a.getWindow();
+		while(true){
+			if(rootW.getContainer() == null) break;
+			rootW = rootW.getContainer();
+		}
+		return rootW.getDecorView();
+	}
+	
+	private View[] getViewRoots() 
+			throws ClassNotFoundException, SecurityException, 
+			NoSuchFieldException, IllegalArgumentException, IllegalAccessException
+	{
+		//Code snippet from ROBOTIUM
+		//SNIPPET START
+		Class<?> windowManagerImpl = Class.forName("android.view.WindowManagerImpl");
+		Field viewsField = windowManagerImpl.getDeclaredField("mViews");
+	
+		String windowManagerString;
+		if(android.os.Build.VERSION.SDK_INT >= 13)
+			windowManagerString = "sWindowManager";
+		else
+			windowManagerString = "mWindowManager";
+	
+		Field instanceField = windowManagerImpl.getDeclaredField(windowManagerString);
+	
+		viewsField.setAccessible(true);
+		instanceField.setAccessible(true);
+		Object instance = instanceField.get(null);
+		return (View[]) viewsField.get(instance);
+	}
+	
+	private boolean analyzeViewTree(MViewAdoptor v){
+		if(!isConnected)
+			return true;
 		
-		
-		//2. Generate and send data
-		MonkeyView mv = MViewBuilder.build(v);
+		//Generate and send data
+		MonkeyView mv = v.get();
 		Log.d("wtchoi","mv Built");
 		try{
 			oos.writeObject(mv); // View Hierarchy
@@ -155,24 +187,7 @@ public class Supervisor implements Runnable{
 			Log.d("wtchoi","Error writing to the socket");
 			return false;
 		}
-		
-		//3. Finishing Connection
-		try{
-			oos.close();
-			socket.close();
-		}
-		catch(Exception e){}
 		return true;
-	}
-	
-	public static void init(){
-		if(supervisor == null){
-			supervisor = new Supervisor();
-			supervisor.sThread = new Thread(supervisor);
-			supervisor.sList = new LinkedList<SLog>();
-			supervisor.sStack = new LinkedList<SLog>();
-			supervisor.activityStates = new HashMap<Activity,ActivityState>();
-		}
 	}
 	
 	public static void start(){
@@ -184,18 +199,11 @@ public class Supervisor implements Runnable{
 		sThread.start();
 	}
 	
-	public static void snooze(){
-		supervisor._snooze();
-	}
-	private void _snooze(){
+	private void snooze(){
 		tickcount = (tickcount > 5)?tickcount:5;
 	}
-
-	public static Activity getCurrentActivity(){
-		return supervisor._getCurrentActivity();
-	}
 	
-	private Activity _getCurrentActivity(){	
+	private Activity getCurrentActivity(){	
 		for(Entry<Activity, ActivityState> e:activityStates.entrySet()){
 			if(e.getValue().isActive)
 				return e.getKey();
