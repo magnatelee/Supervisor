@@ -48,8 +48,9 @@ public class Notepadv3 extends ListActivity {
         
         //INSTRUMENTED
         Log.d("wtchoi","Notepadv3.onCreate");
-        Supervisor.init();
+        Supervisor.init(this.getApplication());
         Supervisor.logActivityCreated(this);
+        Supervisor.clearData();
         
         
         setContentView(R.layout.notes_list);

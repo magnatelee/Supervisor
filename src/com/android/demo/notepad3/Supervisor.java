@@ -2,6 +2,7 @@ package com.android.demo.notepad3;
 
 import android.app.Activity;
 
+import android.app.Application;
 import android.util.Log;
 
 import java.io.IOException;
@@ -31,6 +32,29 @@ class ActivityState{
 	}
 }
 
+enum SupervisorState{
+    INIT,
+    INDEPENDENT,
+    STABLE,
+    UNSTABLE;
+
+    public boolean isStable(){
+        return this == STABLE;
+    }
+    
+    public boolean isUnstable(){
+        return this == UNSTABLE;
+    }
+
+    public boolean isNotStable(){
+        return this != STABLE;
+    }
+
+    public boolean isIndependent(){
+        return this == INDEPENDENT;
+    }
+}
+
 
 public class Supervisor implements Runnable{
 	 
@@ -43,30 +67,41 @@ public class Supervisor implements Runnable{
 	private HashMap<Activity,ActivityState> activityStates;
 	private java.io.ObjectOutputStream oos;
 	private java.io.ObjectInputStream ois;
-	private boolean isConnected = false;
+    private SupervisorState state;
+    private ApplicationWrapper app_wrapper;
+
 	
 	private Supervisor(){}
 
-	public static void init(){
+	public static void init(Application app){
 		if(supervisor == null){
 			supervisor = new Supervisor();
 			supervisor.sThread = new Thread(supervisor);
 			supervisor.sList = new LinkedList<SLog>();
 			supervisor.sStack = new LinkedList<SLog>();
 			supervisor.activityStates = new HashMap<Activity,ActivityState>();
+
+            supervisor.app_wrapper = new ApplicationWrapper(app);
+
+            supervisor.state = SupervisorState.INIT;
 		}
 	}
-	
+
+    public static void clearData(){
+        supervisor.app_wrapper.clearData();
+    }
+
 	@Override
 	public void run(){	
 		int prevsize = 0;
 		
 		while(true){
 			//Establish Server Connection, at first
-			if(isConnected == false)
+			if(state == SupervisorState.INIT)
 				initiateChannel();
 			
 			Activity activeActivity = getCurrentActivity();
+			
 			//Tick Sleep
 			try{
 				if(activeActivity == null){
@@ -80,39 +115,52 @@ public class Supervisor implements Runnable{
 			}
 			catch(InterruptedException e){}
 			
-			//Log.d("wtchoi","Loop"+tickcount+","+sList.size()+","+sStack.size());
-			//if(sStack.size() == 1)
-			//	Log.d("wtchoi",sStack.getLast().toString());
+            //Sanity Check
+            if(state.isStable() && this.sList.size() != 0){
+                throw new RuntimeException("Unreachable program point Reached");
+            }
+
+            if(state.isStable()){
+                try{
+                    AckPacket ap = (AckPacket) ois.readObject();
+                    state = SupervisorState.UNSTABLE;
+                }
+                catch(Exception e){
+                    throw new RuntimeException("cannot read ack");
+                }
+            }
 			
 			synchronized(this.sList){
 				if(tickcount == 0){
+                    //Program is stable state
 					if(prevsize == this.sList.size() && sStack.size() == 0){
-						
-						
-						//TODO : recognize this is new state. only send information at new state
-						//view hierarchy analysis
-						
-						try {
-							View[] views = getViewRoots(); 
-							LinkedList<MonkeyView> vlist = new LinkedList<MonkeyView>();
-							for(View v: views){
-								//TODO: recognize interesting views
-								//Assumption: views are sorted w.r.t Z-hierarchy
-								Log.d("wtchoi!","<<" + v.getWidth() + "," + v.getHeight() + ">>");
-								vlist.add((new MViewAdoptorV(v)).get());
-							}
-							
-							MonkeyView mroot = new MonkeyView(0,0,0,0,vlist);
-							if(analyzeViewTree(new MViewAdoptorMV(mroot))){
-								sList.clear();
-							}
-							Log.d("wtchoi","handle!:"+prevsize);
-							
-						} catch (Exception e) {
-							e.printStackTrace();
-							System.exit(1);
-						}
-						//SNIPPET END
+                        if(state.isNotStable()){
+                            if(state.isUnstable()){
+						        try {
+                                    //view hierarchy analysis
+        							View[] views = getViewRoots();
+	        						LinkedList<MonkeyView> vlist = new LinkedList<MonkeyView>();
+		        					for(View v: views){
+			        					//TODO: recognize interesting views
+				        				//Assumption: views are sorted w.r.t Z-hierarchy
+					        			Log.d("wtchoi!","<<" + v.getWidth() + "," + v.getHeight() + ">>");
+						        		vlist.add((new MViewAdoptorV(v)).get());
+        							}
+	        						MonkeyView mroot = new MonkeyView(0,0,0,0,vlist);
+		        					analyzeViewTree(new MViewAdoptorMV(mroot));
+                                    Log.d("wtchoi","handle!:"+prevsize);
+                                }
+					    	    catch (Exception e) {
+						    	    e.printStackTrace();
+							        System.exit(1);
+						        }
+                                state = SupervisorState.STABLE;
+                            }
+                            sList.clear();
+                        }
+						else{
+                            throw new RuntimeException("Unreachable program point Reached");
+                        }
 					}
 					tickcount = 10;
 				}
@@ -127,16 +175,17 @@ public class Supervisor implements Runnable{
 	private void initiateChannel(){
 		java.net.Socket socket = null;
 		try {
-			socket = new java.net.Socket("128.32.45.127",13339);
+			socket = new java.net.Socket("10.0.1.2",13339);
 			//Log.d("wtchoi","connected!");
 		
 			oos = new java.io.ObjectOutputStream(socket.getOutputStream());
 			ois = new java.io.ObjectInputStream(socket.getInputStream());
 			
 			Log.d("wtchoi","stream initialized");
-			isConnected = true;
+			state = SupervisorState.UNSTABLE;
 		} catch (Exception e) {
 			Log.d("wtchoi","cannot connect to the server");
+            state = SupervisorState.INDEPENDENT;
 		}
 	}
 	
@@ -173,7 +222,7 @@ public class Supervisor implements Runnable{
 	}
 	
 	private boolean analyzeViewTree(MViewAdoptor v){
-		if(!isConnected)
+		if(state.isIndependent())
 			return true;
 		
 		//Generate and send data
