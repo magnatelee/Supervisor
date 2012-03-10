@@ -1,4 +1,5 @@
 package com.android.demo.notepad3;
+//INSTRUMENTATION
 
 import android.app.Activity;
 

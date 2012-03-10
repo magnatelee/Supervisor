@@ -1,4 +1,5 @@
 package com.android.demo.notepad3;
+//INSTRUMENTATION
 
 class SLog{
 	public static final int CALL = 1;
