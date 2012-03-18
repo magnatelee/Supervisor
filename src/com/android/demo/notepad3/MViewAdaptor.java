@@ -1,24 +1,21 @@
 package com.android.demo.notepad3;
 //INSTRUMENTATION
 
-import java.io.Serializable;
 import java.util.LinkedList;
 
 import android.view.View;
 import android.view.ViewGroup;
 import edu.berkeley.wtchoi.cc.MonkeyView;
 
-import android.util.Log;
-
-public interface MViewAdoptor{
+public interface MViewAdaptor {
 	public MonkeyView get(); 
 }
 
-class MViewAdoptorV implements MViewAdoptor{
+class MViewAdaptorV implements MViewAdaptor {
 	private View mv;
 	private MonkeyView mmv;
 	
-	public MViewAdoptorV(View v){
+	public MViewAdaptorV(View v){
 		mv = v;
 		mmv = null;
 	}
@@ -52,10 +49,10 @@ class MViewAdoptorV implements MViewAdoptor{
 	}
 }
 
-class MViewAdoptorMV implements MViewAdoptor{
+class MViewAdaptorMV implements MViewAdaptor {
 	private MonkeyView mmv;
 	
-	public MViewAdoptorMV(MonkeyView mv){
+	public MViewAdaptorMV(MonkeyView mv){
 		mmv = mv;
 	}
 	

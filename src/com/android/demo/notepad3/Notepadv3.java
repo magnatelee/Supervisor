@@ -195,7 +195,7 @@ public class Notepadv3 extends ListActivity {
     	Supervisor.logReturn("onActivityResult",this);
     }
     
-    //INSTRUMTENTED
+    //INSTRUMENTED
     @Override
     protected void onStart(){
     	Log.d("wtchoi","Notepadv3.onStart");

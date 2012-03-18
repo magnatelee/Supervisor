@@ -177,7 +177,7 @@ public class NoteEdit extends Activity {
     	Supervisor.logReturn("saveState",this);
     }
 
-    //INSTRUMTENTED
+    //INSTRUMENTED
     @Override
     protected void onStart(){
     	Supervisor.logStart(this);

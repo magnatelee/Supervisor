@@ -8,15 +8,11 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.lang.reflect.*;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map.Entry;
 
-import android.os.*;
-import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
 
 import edu.berkeley.wtchoi.cc.*;
@@ -145,10 +141,10 @@ public class Supervisor implements Runnable{
 			        					//TODO: recognize interesting views
 				        				//Assumption: views are sorted w.r.t Z-hierarchy
 					        			Log.d("wtchoi!","<<" + v.getWidth() + "," + v.getHeight() + ">>");
-						        		vlist.add((new MViewAdoptorV(v)).get());
+						        		vlist.add((new MViewAdaptorV(v)).get());
         							}
 	        						MonkeyView mroot = new MonkeyView(0,0,0,0,vlist);
-		        					analyzeViewTree(new MViewAdoptorMV(mroot));
+		        					analyzeViewTree(new MViewAdaptorMV(mroot));
                                     Log.d("wtchoi","handle!:"+prevsize);
                                 }
 					    	    catch (Exception e) {
@@ -222,7 +218,7 @@ public class Supervisor implements Runnable{
 		return (View[]) viewsField.get(instance);
 	}
 	
-	private boolean analyzeViewTree(MViewAdoptor v){
+	private boolean analyzeViewTree(MViewAdaptor v){
 		if(state.isIndependent())
 			return true;
 		
